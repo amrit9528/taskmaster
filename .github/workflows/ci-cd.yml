@@ -116,12 +116,13 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Get API Gateway URL and hit health endpoint
+      - name: Get ALB DNS name and hit health endpoint
         run: |
-          INVOKE_URL=$(aws apigatewayv2 get-apis \
-            --region ${{ env.AWS_REGION }} \
-            --query "Items[?Name=='taskmaster-dev-api'].ApiEndpoint" \
-            --output text)
-          echo "Testing: $INVOKE_URL/actuator/health"
-          curl --fail --retry 5 --retry-delay 15 \
-            "$INVOKE_URL/actuator/health"
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names taskmaster-alb \
+            --query "LoadBalancers[0].DNSName" \
+            --output text \
+            --region ap-south-1)
+          echo "Testing: https://$ALB_DNS/actuator/health"
+          curl --fail --retry 5 --retry-delay 15 -k \
+            "https://$ALB_DNS/actuator/health"
