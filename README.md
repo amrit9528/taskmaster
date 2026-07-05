@@ -2,6 +2,15 @@
 
 This is a simple Spring Boot application.
 
+## Live URLs
+| | URL |
+|---|---|
+| ❤️ Health Check | https://amrit-ch.website/actuator/health |
+| 📊 Grafana | https://amrit-ch.website/grafana/ |
+| 📈 Dashboard | https://amrit-ch.website/grafana/d/efr6oe64zqbk0c/taskmaster-ecs-monitoring |
+
+**Grafana credentials:** username: `admin` — password stored in AWS Secrets Manager (`taskmaster/grafana-admin-password`)
+
 **Features:**
 
 **Getting Started:**
