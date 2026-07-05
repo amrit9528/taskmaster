@@ -18,13 +18,13 @@ resource "aws_lb_target_group" "app" {
   target_type = "ip"
 
   health_check {
-    path                = var.health_check_path
+    path                = "/actuator/health"
     protocol            = "HTTP"
-    healthy_threshold   = 3
+    healthy_threshold   = 2
     unhealthy_threshold = 3
-    timeout             = 5
+    timeout             = 10
     interval            = 30
-    matcher             = "200-399"
+    matcher             = "200"
   }
 
   tags = {

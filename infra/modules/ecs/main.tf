@@ -62,6 +62,13 @@ resource "aws_ecs_task_definition" "app" {
         }
       ]
 
+      environment = [
+        {
+          name  = "JAVA_TOOL_OPTIONS"
+          value = "-XX:TieredStopAtLevel=1 -Xms256m -Xmx512m"
+        }
+      ]
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -99,6 +106,8 @@ resource "aws_ecs_service" "app" {
     container_name   = "${var.name_prefix}-app"
     container_port   = var.container_port
   }
+
+  health_check_grace_period_seconds = 240
 
   lifecycle {
     ignore_changes = [task_definition]
