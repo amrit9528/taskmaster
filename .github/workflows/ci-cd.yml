@@ -44,8 +44,38 @@ jobs:
           name: app-jar
           path: target/*.jar
 
-  build-and-push-ecr:
+  build-prometheus:
     needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create ECR repo for prometheus if not exists
+        run: |
+          aws ecr describe-repositories --repository-names taskmaster-prometheus \
+            --region ap-south-1 2>/dev/null || \
+          aws ecr create-repository --repository-name taskmaster-prometheus \
+            --region ap-south-1
+
+      - name: Build and push prometheus image
+        run: |
+          IMAGE_URI=${{ env.ECR_REGISTRY }}/taskmaster-prometheus:latest
+          docker build -t $IMAGE_URI ./prometheus/
+          docker push $IMAGE_URI
+
+  build-and-push-ecr:
+    needs: [build-and-test, build-prometheus]
     runs-on: ubuntu-latest
     permissions:
       id-token: write

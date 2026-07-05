@@ -17,3 +17,11 @@ output "alb_dns_name" {
   value       = module.alb.alb_dns_name
   description = "Point amrit-ch.website CNAME at this value in Namecheap"
 }
+
+output "grafana_url" {
+  value = module.monitoring.grafana_url
+}
+
+output "prometheus_url" {
+  value = module.monitoring.prometheus_url
+}

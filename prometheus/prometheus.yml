@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'taskmaster-app'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['taskmaster-alb-966299162.ap-south-1.elb.amazonaws.com:443']
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    scrape_interval: 15s
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
