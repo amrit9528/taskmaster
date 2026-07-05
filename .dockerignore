@@ -1,0 +1,11 @@
+target/
+.git/
+.gitignore
+*.md
+.mvn/wrapper/maven-wrapper.jar
+gradlew
+gradlew.bat
+gradle/
+*.iml
+.idea/
+.vscode/
