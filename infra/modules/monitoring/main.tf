@@ -58,9 +58,9 @@ resource "aws_security_group" "monitoring" {
   vpc_id = var.vpc_id
 
   ingress {
-    description     = "Prometheus from ALB"
-    from_port       = 9090
-    to_port         = 9090
+    description     = "Prometheus (via nginx sidecar) from ALB"
+    from_port       = 9091
+    to_port         = 9091
     protocol        = "tcp"
     security_groups = [var.alb_security_group_id]
   }
@@ -105,6 +105,13 @@ resource "aws_ecs_task_definition" "prometheus" {
       image     = "${var.ecr_registry}/taskmaster-prometheus:latest"
       essential = true
 
+      command = [
+        "--config.file=/etc/prometheus/prometheus.yml",
+        "--storage.tsdb.path=/prometheus",
+        "--web.console.libraries=/usr/share/prometheus/console_libraries",
+        "--web.console.templates=/usr/share/prometheus/consoles"
+      ]
+
       portMappings = [
         {
           containerPort = 9090
@@ -117,7 +124,40 @@ resource "aws_ecs_task_definition" "prometheus" {
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.prometheus.name
           "awslogs-region"        = data.aws_region.current.name
-          "awslogs-stream-prefix" = "ecs"
+          "awslogs-stream-prefix" = "prometheus"
+        }
+      }
+    },
+    {
+      name      = "nginx-proxy"
+      image     = "nginx:alpine"
+      essential = false
+
+      portMappings = [
+        {
+          containerPort = 9091
+          protocol      = "tcp"
+        }
+      ]
+
+      command = [
+        "/bin/sh", "-c",
+        "echo 'server { listen 9091; location /prometheus/ { rewrite ^/prometheus/(.*) /$1 break; proxy_pass http://localhost:9090; } location /prometheus { return 301 /prometheus/; } }' > /etc/nginx/conf.d/prometheus.conf && nginx -g 'daemon off;'"
+      ]
+
+      dependsOn = [
+        {
+          containerName = "prometheus"
+          condition     = "START"
+        }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.prometheus.name
+          "awslogs-region"        = data.aws_region.current.name
+          "awslogs-stream-prefix" = "nginx-proxy"
         }
       }
     }
@@ -139,8 +179,8 @@ resource "aws_ecs_service" "prometheus" {
 
   load_balancer {
     target_group_arn = aws_lb_target_group.prometheus.arn
-    container_name   = "prometheus"
-    container_port   = 9090
+    container_name   = "nginx-proxy"
+    container_port   = 9091
   }
 }
 
@@ -158,7 +198,7 @@ resource "aws_ecs_task_definition" "grafana" {
   container_definitions = jsonencode([
     {
       name      = "grafana"
-      image     = "grafana/grafana:10.4.0"
+      image     = "${var.ecr_registry}/taskmaster-grafana:latest"
       essential = true
 
       portMappings = [
@@ -170,12 +210,17 @@ resource "aws_ecs_task_definition" "grafana" {
 
       environment = [
         { name = "GF_SECURITY_ADMIN_USER", value = "admin" },
-        { name = "GF_SECURITY_ADMIN_PASSWORD", value = var.grafana_admin_password },
         { name = "GF_SERVER_ROOT_URL", value = "https://amrit-ch.website/grafana/" },
         { name = "GF_SERVER_SERVE_FROM_SUB_PATH", value = "true" },
         { name = "GF_AUTH_ANONYMOUS_ENABLED", value = "false" },
-        { name = "GF_AWS_default_REGION", value = "ap-south-1" },
-        { name = "GF_AWS_default_AUTH", value = "ec2_iam_role" }
+        { name = "GF_PATHS_PROVISIONING", value = "/etc/grafana/provisioning" }
+      ]
+
+      secrets = [
+        {
+          name      = "GF_SECURITY_ADMIN_PASSWORD"
+          valueFrom = "arn:aws:secretsmanager:ap-south-1:610269527458:secret:taskmaster/grafana-admin-password"
+        }
       ]
 
       logConfiguration = {
@@ -213,19 +258,23 @@ resource "aws_ecs_service" "grafana" {
 # F) ALB target groups and listener rules
 
 resource "aws_lb_target_group" "prometheus" {
-  name        = "prometheus-tg"
-  port        = 9090
+  name_prefix = "prom-"
+  port        = 9091
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
 
   health_check {
-    path                = "/-/healthy"
+    path                = "/prometheus/-/healthy"
     healthy_threshold   = 2
     unhealthy_threshold = 3
     interval            = 30
     timeout             = 10
     matcher             = "200"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

@@ -47,10 +47,3 @@ variable "ecr_registry" {
   description = "ECR registry URL"
   type        = string
 }
-
-variable "grafana_admin_password" {
-  description = "Admin password for the Grafana instance"
-  type        = string
-  sensitive   = true
-  default     = "Taskmaster@123"
-}

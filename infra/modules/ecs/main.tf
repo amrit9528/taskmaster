@@ -35,6 +35,21 @@ resource "aws_iam_role_policy_attachment" "execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy" "execution_secrets" {
+  name = "taskmaster-execution-secrets"
+  role = aws_iam_role.execution.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "secretsmanager:GetSecretValue"
+      ]
+      Resource = "arn:aws:secretsmanager:ap-south-1:610269527458:secret:taskmaster/grafana-admin-password*"
+    }]
+  })
+}
+
 resource "aws_iam_role" "task" {
   name               = "${var.name_prefix}-${var.environment}-task-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_assume_role.json
